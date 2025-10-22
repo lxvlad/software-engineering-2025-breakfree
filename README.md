@@ -1,44 +1,48 @@
-# BreakFree — трекер звичок (Core + WPF)
+# 🧠 BreakFree — Habit Tracking System  
+**Course:** Програмна інженерія  
+**Team:** 5 students (cross-platform setup — 2 Mac users)  
+**Language:** C#, .NET 8, WPF / ADO.NET / EF Core  
+**Database:** SQLite  
+**IDE:** Visual Studio / VS Code  
 
-**Stack:** .NET 8, EF Core + SQLite, ADO.NET, WPF (Windows UI).  
-**Кросплатформа:** усе ядро збирається і тестується на macOS/Linux/Windows; WPF — лише Windows.
+---
 
-## Структура
-```
-/src/BreakFree.Core/     — моделі, DbContext, сервіси, ADO.NET-звіти
-/src/BreakFree.Wpf/      — WPF UI (посилається на Core)
-/tests/BreakFree.Tests/  — xUnit тести (кросплатформа)
-```
+## 💡 Опис проєкту  
+**BreakFree** — це кросплатформенний застосунок-трекер, який допомагає користувачам позбавлятися шкідливих звичок і формувати корисні.  
+Програма дозволяє:
+- відстежувати дні без зривів, прогрес і серії (streaks);
+- переглядати аналітику успіхів;
+- зберігати мотиваційні цитати та SOS-допомогу;
+- бачити фінансову економію;
+- отримувати підтримку під час кризових моментів.
 
-## Швидкий старт
+---
 
-### Mac / Linux (ядро та тести)
+## 🧩 Архітектура проєкту  
+Реалізовано **трирівневу архітектуру (3-tier architecture)**:
+
+
+---
+
+## 🧱 База даних  
+- **Тип:** SQLite  
+- **Провайдер:** Microsoft.Data.Sqlite  
+- **Скрипт:** [`db/create_breakfree.sql`](db/create_breakfree.sql)  
+- **Основні таблиці:**  
+  - `Users` — користувачі  
+  - `Habits` — звички  
+  - `DailyStatuses` — записи за день  
+  - `Achievements`, `Savings`, `Quotes`, `SOSActions`, `UserSOSLogs`  
+
+📊 **ER-діаграма:** `docs/ERD_BreakFree.jpeg`  
+📄 **UML-опис:** `docs/BreakFree_Requirements.docx`
+
+---
+
+## ⚙️ Як запустити проєкт
+
+### 1️⃣ Ініціалізація бази та сидинг (ADO.NET + Bogus)
 ```bash
+cd src/BreakFree.ConsoleSeed
 dotnet restore
-dotnet build ./src/BreakFree.Core -c Debug
-dotnet test ./tests/BreakFree.Tests -c Debug
-```
-
-### Windows (WPF + ядро)
-Відкрий `BreakFree.sln` у Visual Studio 2022 і натисни **F5**.  
-Або CLI:
-```bash
-dotnet restore
-dotnet build ./src/BreakFree.Wpf/BreakFree.Wpf.csproj -c Debug
-```
-
-## EF Core міграції
-```bash
-cd src/BreakFree.Core
-dotnet ef migrations add Init
-dotnet ef database update
-```
-
-> SQLite база `breakfree.db` створюється в робочій директорії процесу.
-
-## CI
-- Job **core** (ubuntu + macos): збирає `BreakFree.Core` і ганяє тести.
-- Job **wpf** (windows): збирає `BreakFree.Wpf` і ганяє тести.
-
-## Ліцензія
-MIT
+dotnet run
