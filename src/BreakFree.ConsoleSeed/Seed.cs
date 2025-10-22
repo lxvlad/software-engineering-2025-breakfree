@@ -1,204 +1,211 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
+using Bogus;
+using System.Linq;
 
 namespace BreakFree.ConsoleSeed
 {
     public static class Seed
     {
-        private const int SEED_COUNT = 40;
-        private static readonly string[] HabitNames = { "Smoking", "Alcohol", "SocialMedia", "Sugar", "Gaming" };
-        private static readonly string[] Triggers = { "stress", "boredom", "company", "party", "fatigue" };
-        private static readonly string[] Categories = { "physical", "breathing", "social", "mindfulness", "distraction" };
-        private static readonly string[] Quotes = {
-            "Small steps every day.", "You are stronger than your cravings.", "Progress, not perfection.", "One day at a time."
-        };
-
+        private const int MinCount = 30;
+        private const int MaxCount = 50;
         private static Random Rng = new Random();
 
-        public static void Run(string connString, string baseDir)
+        public static void SeedWithBogus(string connectionString)
         {
-            using var conn = new SqliteConnection(connString);
-            conn.Open();
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+            Console.WriteLine("[INFO] Seeding database with Bogus-generated data...");
 
-            if (IsTableEmpty(conn, "Users"))
+            // --- USERS ---
+            var userFaker = new Faker<UserFake>("uk")
+                .RuleFor(u => u.Name, f => f.Person.FullName)
+                .RuleFor(u => u.Email, f => f.Internet.Email())
+                .RuleFor(u => u.Password, f => f.Internet.Password())
+                .RuleFor(u => u.CreatedAt, f => f.Date.Past(2).ToString("yyyy-MM-dd"));
+
+            var users = userFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var u in users)
             {
-                Console.WriteLine("[SEED] Users");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var name = $"User{i+1}";
-                    var email = $"user{i+1}@example.com";
-                    var createdAt = DateTime.Today.AddDays(-Rng.Next(1, 120)).ToString("yyyy-MM-dd");
-                    Exec(conn, "INSERT INTO Users(user_name,email,password,created_at) VALUES ($n,$e,$p,$c)",
-                        ("$n", name), ("$e", email), ("$p", "P@ssw0rd!"), ("$c", createdAt));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO Users (user_name,email,password,created_at) VALUES (@name,@email,@password,@created)";
+                cmd.Parameters.AddWithValue("@name", u.Name);
+                cmd.Parameters.AddWithValue("@email", u.Email);
+                cmd.Parameters.AddWithValue("@password", u.Password);
+                cmd.Parameters.AddWithValue("@created", u.CreatedAt);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "SOSActions"))
+            var userIds = GetIds(connection, "Users", "user_id");
+
+            // --- HABITS ---
+            var habitFaker = new Faker<HabitFake>("uk")
+                .RuleFor(h => h.UserId, f => f.PickRandom(userIds))
+                .RuleFor(h => h.Name, f => f.Lorem.Word())
+                .RuleFor(h => h.StartDate, f => f.Date.Past(1).ToString("yyyy-MM-dd"))
+                .RuleFor(h => h.GoalDays, f => f.Random.Int(10, 90))
+                .RuleFor(h => h.Motivation, f => f.Random.Bool() ? f.Lorem.Sentence() : null)
+                .RuleFor(h => h.IsActive, f => f.Random.Bool() ? 1 : 0)
+                .RuleFor(h => h.TotalDays, f => f.Random.Int(1, 100))
+                .RuleFor(h => h.CurrentStreak, f => f.Random.Int(0, 20))
+                .RuleFor(h => h.TotalSaving, f => f.Random.Decimal(0, 5000));
+
+            var habits = habitFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var h in habits)
             {
-                Console.WriteLine("[SEED] SOSActions");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var text = $"Action {i+1}: do something helpful";
-                    var cat = Categories[Rng.Next(Categories.Length)];
-                    Exec(conn, "INSERT INTO SOSActions(text,category) VALUES ($t,$c)",
-                        ("$t", text), ("$c", cat));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO Habits 
+                    (user_id, habit_name, start_date, goal_days, motivation, is_active, total_days, current_streak, total_saving)
+                    VALUES (@uid,@name,@start,@goal,@mot,@active,@total,@streak,@saving)";
+                cmd.Parameters.AddWithValue("@uid", h.UserId);
+                cmd.Parameters.AddWithValue("@name", h.Name);
+                cmd.Parameters.AddWithValue("@start", h.StartDate);
+                cmd.Parameters.AddWithValue("@goal", h.GoalDays);
+                cmd.Parameters.AddWithValue("@mot", (object?)h.Motivation ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@active", h.IsActive);
+                cmd.Parameters.AddWithValue("@total", h.TotalDays);
+                cmd.Parameters.AddWithValue("@streak", h.CurrentStreak);
+                cmd.Parameters.AddWithValue("@saving", h.TotalSaving);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "Quotes"))
-            {
-                Console.WriteLine("[SEED] Quotes");
-                for (int i = 0; i < SEED_COUNT; i++)
+            var habitIds = GetIds(connection, "Habits", "habit_id");
+
+            // --- DAILY STATUSES ---
+            var statusDates = new Dictionary<int, HashSet<string>>();
+            var statusFaker = new Faker<DailyStatusFake>("uk")
+                .RuleFor(s => s.HabitId, f =>
                 {
-                    var q = Quotes[Rng.Next(Quotes.Length)];
-                    Exec(conn, "INSERT INTO Quotes(text) VALUES ($t)", ("$t", q));
-                }
+                    int habitId = f.PickRandom(habitIds);
+                    if (!statusDates.ContainsKey(habitId))
+                        statusDates[habitId] = new HashSet<string>();
+                    return habitId;
+                })
+                .RuleFor(s => s.Date, (f, s) =>
+                {
+                    string date;
+                    do
+                    {
+                        date = f.Date.Recent(60).ToString("yyyy-MM-dd");
+                    } while (statusDates[s.HabitId].Contains(date));
+                    statusDates[s.HabitId].Add(date);
+                    return date;
+                })
+                .RuleFor(s => s.IsClean, f => f.Random.Bool() ? 1 : 0)
+                .RuleFor(s => s.Trigger, f => f.Lorem.Word())
+                .RuleFor(s => s.Note, f => f.Random.Bool() ? f.Lorem.Sentence() : null)
+                .RuleFor(s => s.Craving, f => f.Random.Int(0, 10));
+
+            var statuses = statusFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var s in statuses)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO DailyStatuses 
+                    (habit_id, date, is_clean, trigger, note, craving_level)
+                    VALUES (@hid,@date,@clean,@trig,@note,@craving)";
+                cmd.Parameters.AddWithValue("@hid", s.HabitId);
+                cmd.Parameters.AddWithValue("@date", s.Date);
+                cmd.Parameters.AddWithValue("@clean", s.IsClean);
+                cmd.Parameters.AddWithValue("@trig", s.Trigger);
+                cmd.Parameters.AddWithValue("@note", (object?)s.Note ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@craving", s.Craving);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "Habits"))
+            // --- ACHIEVEMENTS ---
+            var achievementFaker = new Faker<AchievementFake>("uk")
+                .RuleFor(a => a.UserId, f => f.PickRandom(userIds))
+                .RuleFor(a => a.Title, f => f.Lorem.Sentence())
+                .RuleFor(a => a.AchievedAt, f => f.Date.Past(2).ToString("yyyy-MM-dd"));
+
+            var achievements = achievementFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var a in achievements)
             {
-                Console.WriteLine("[SEED] Habits");
-                var userCount = Count(conn, "Users");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var userId = Rng.Next(1, userCount + 1);
-                    var name = HabitNames[Rng.Next(HabitNames.Length)];
-                    var startDate = DateTime.Today.AddDays(-Rng.Next(1, 100)).ToString("yyyy-MM-dd");
-                    var goalDays = Rng.Next(7, 61);
-                    var motivation = Rng.Next(0, 2) == 0 ? (string?)null : "Be better.";
-                    var isActive = Rng.Next(0, 2) == 0 ? 0 : 1;
-                    var totalDays = Rng.Next(0, 100);
-                    var streak = Rng.Next(0, 30);
-                    var saving = Math.Round((decimal)Rng.NextDouble() * 500, 2);
-                    Exec(conn, @"INSERT INTO Habits(user_id,habit_name,start_date,goal_days,motivation,is_active,total_days,current_streak,total_saving)
-                                 VALUES ($u,$n,$sd,$g,$m,$a,$td,$cs,$ts)",
-                        ("$u", userId), ("$n", name), ("$sd", startDate), ("$g", goalDays),
-                        ("$m", (object?)motivation ?? DBNull.Value), ("$a", isActive),
-                        ("$td", totalDays), ("$cs", streak), ("$ts", saving));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO Achievements (user_id, title, achieved_at) VALUES (@uid,@title,@achieved)";
+                cmd.Parameters.AddWithValue("@uid", a.UserId);
+                cmd.Parameters.AddWithValue("@title", a.Title);
+                cmd.Parameters.AddWithValue("@achieved", a.AchievedAt);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "DailyStatuses"))
+            // --- SOS ACTIONS ---
+            var sosFaker = new Faker<SOSActionFake>("uk")
+                .RuleFor(s => s.Text, f => f.Lorem.Sentence())
+                .RuleFor(s => s.Category, f => f.PickRandom(new[] { "Health", "Mind", "Social", "Other" }));
+
+            var sosActions = sosFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var s in sosActions)
             {
-                Console.WriteLine("[SEED] DailyStatuses");
-                var habitCount = Count(conn, "Habits");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var habitId = Rng.Next(1, habitCount + 1);
-                    var date = DateTime.Today.AddDays(-Rng.Next(0, 60)).ToString("yyyy-MM-dd");
-                    var isClean = Rng.Next(0, 2);
-                    var trigger = Triggers[Rng.Next(Triggers.Length)];
-                    var note = Rng.Next(0, 2) == 0 ? (string?)null : "Note...";
-                    var craving = Rng.Next(0, 11);
-                    Exec(conn, @"INSERT OR IGNORE INTO DailyStatuses(habit_id,date,is_clean,trigger,note,craving_level)
-                                 VALUES ($h,$d,$c,$t,$n,$cl)",
-                        ("$h", habitId), ("$d", date), ("$c", isClean), ("$t", trigger),
-                        ("$n", (object?)note ?? DBNull.Value), ("$cl", craving));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO SOSActions (text, category) VALUES (@text,@category)";
+                cmd.Parameters.AddWithValue("@text", s.Text);
+                cmd.Parameters.AddWithValue("@category", s.Category);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "Savings"))
+            var sosIds = GetIds(connection, "SOSActions", "action_id");
+
+            // --- USER SOS LOGS ---
+            var userSOSFaker = new Faker<UserSOSLogFake>("uk")
+                .RuleFor(u => u.UserId, f => f.PickRandom(userIds))
+                .RuleFor(u => u.ActionId, f => f.PickRandom(sosIds))
+                .RuleFor(u => u.Date, f => f.Date.Recent(60).ToString("yyyy-MM-dd"))
+                .RuleFor(u => u.Worked, f => f.Random.Bool() ? 1 : 0);
+
+            var userSOSLogs = userSOSFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var log in userSOSLogs)
             {
-                Console.WriteLine("[SEED] Savings");
-                var habitCount = Count(conn, "Habits");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var habitId = Rng.Next(1, habitCount + 1);
-                    var amount = Math.Round((decimal)Rng.NextDouble() * 100, 2);
-                    Exec(conn, "INSERT INTO Savings(habit_id,amount) VALUES ($h,$a)",
-                        ("$h", habitId), ("$a", amount));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO UserSOSLogs (user_id, action_id, date, worked) VALUES (@uid,@aid,@date,@worked)";
+                cmd.Parameters.AddWithValue("@uid", log.UserId);
+                cmd.Parameters.AddWithValue("@aid", log.ActionId);
+                cmd.Parameters.AddWithValue("@date", log.Date);
+                cmd.Parameters.AddWithValue("@worked", log.Worked);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "Achievements"))
+            // --- QUOTES ---
+            var quoteFaker = new Faker<QuoteFake>("uk")
+                .RuleFor(q => q.Text, f => f.Lorem.Sentence());
+
+            var quotes = quoteFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var q in quotes)
             {
-                Console.WriteLine("[SEED] Achievements");
-                var userCount = Count(conn, "Users");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var userId = Rng.Next(1, userCount + 1);
-                    var title = $"Streak {Rng.Next(3, 31)} days";
-                    var achievedAt = DateTime.Today.AddDays(-Rng.Next(1, 90)).ToString("yyyy-MM-dd");
-                    Exec(conn, "INSERT INTO Achievements(user_id,title,achieved_at) VALUES ($u,$t,$d)",
-                        ("$u", userId), ("$t", title), ("$d", achievedAt));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO Quotes (text) VALUES (@text)";
+                cmd.Parameters.AddWithValue("@text", q.Text);
+                cmd.ExecuteNonQuery();
             }
 
-            if (IsTableEmpty(conn, "UserSOSLogs"))
+            // --- SAVINGS ---
+            var savingFaker = new Faker<SavingFake>("uk")
+                .RuleFor(s => s.HabitId, f => f.PickRandom(habitIds))
+                .RuleFor(s => s.Amount, f => f.Random.Decimal(10, 500));
+
+            var savings = savingFaker.Generate(Rng.Next(MinCount, MaxCount));
+            foreach (var s in savings)
             {
-                Console.WriteLine("[SEED] UserSOSLogs");
-                var userCount = Count(conn, "Users");
-                var actionCount = Count(conn, "SOSActions");
-                for (int i = 0; i < SEED_COUNT; i++)
-                {
-                    var userId = Rng.Next(1, userCount + 1);
-                    var actionId = Rng.Next(1, actionCount + 1);
-                    var date = DateTime.Today.AddDays(-Rng.Next(0, 60)).ToString("yyyy-MM-dd");
-                    var worked = Rng.Next(0, 2);
-                    Exec(conn, "INSERT INTO UserSOSLogs(user_id,action_id,date,worked) VALUES ($u,$a,$d,$w)",
-                        ("$u", userId), ("$a", actionId), ("$d", date), ("$w", worked));
-                }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"INSERT INTO Savings (habit_id, amount) VALUES (@hid,@amount)";
+                cmd.Parameters.AddWithValue("@hid", s.HabitId);
+                cmd.Parameters.AddWithValue("@amount", s.Amount);
+                cmd.ExecuteNonQuery();
             }
 
-            Console.WriteLine("[SEED] Done.");
+            Console.WriteLine("[INFO] Seeding complete!");
         }
 
-        public static void PrintSamples(string connString)
+        private static int[] GetIds(SqliteConnection connection, string table, string idColumn)
         {
-            using var conn = new SqliteConnection(connString);
-            conn.Open();
-            PrintTop5(conn, "Users", "user_id, user_name, email, created_at");
-            PrintTop5(conn, "Habits", "habit_id, user_id, habit_name, start_date, goal_days");
-            PrintTop5(conn, "DailyStatuses", "status_id, habit_id, date, is_clean, trigger");
-            PrintTop5(conn, "Achievements", "achievement_id, user_id, title, achieved_at");
-            PrintTop5(conn, "SOSActions", "action_id, text, category");
-            PrintTop5(conn, "UserSOSLogs", "log_id, user_id, action_id, date, worked");
-            PrintTop5(conn, "Savings", "saving_id, habit_id, amount");
-            PrintTop5(conn, "Quotes", "quote_id, text");
-        }
-
-        private static bool IsTableEmpty(SqliteConnection conn, string table)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT CASE WHEN EXISTS(SELECT 1 FROM {table} LIMIT 1) THEN 0 ELSE 1 END;";
-            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
-        }
-
-        private static int Count(SqliteConnection conn, string table)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT COUNT(*) FROM {table};";
-            return Convert.ToInt32(cmd.ExecuteScalar());
-        }
-
-        private static void Exec(SqliteConnection conn, string sql, params (string, object)[] p)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = sql;
-            foreach (var (k, v) in p)
-            {
-                cmd.Parameters.AddWithValue(k, v);
-            }
-            cmd.ExecuteNonQuery();
-        }
-
-        private static void PrintTop5(SqliteConnection conn, string table, string cols)
-        {
-            Console.WriteLine($"\n=== {table} (top 5) ===");
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT {cols} FROM {table} LIMIT 5;";
-            using var r = cmd.ExecuteReader();
-            var schema = r.GetColumnSchema();
-            while (r.Read())
-            {
-                var parts = new System.Collections.Generic.List<string>();
-                for (int i = 0; i < r.FieldCount; i++)
-                {
-                    parts.Add($"{schema[i].ColumnName}={r.GetValue(i)}");
-                }
-                Console.WriteLine(string.Join(" | ", parts));
-            }
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT {idColumn} FROM {table}";
+            using var reader = cmd.ExecuteReader();
+            var ids = new List<int>();
+            while (reader.Read())
+                ids.Add(reader.GetInt32(0));
+            return ids.ToArray();
         }
     }
 }
