@@ -21,3 +21,10 @@ packages/
 # Others
 *.DS_Store
 Thumbs.db
+
+*BreakFree.BLL.csproj
+*BreakFree.DAL.csproj
+*BreakFree.Presentation.csproj
+
+*breakfree.db
+*breakfree.sqbpro
