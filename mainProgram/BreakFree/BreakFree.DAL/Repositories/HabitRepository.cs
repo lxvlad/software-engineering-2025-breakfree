@@ -6,39 +6,38 @@ namespace BreakFree.DAL.Repositories
 {
     public class HabitRepository
     {
-        public void AddHabit(Habit habit)
+        private readonly BreakFreeContext _context;
+
+        public HabitRepository(BreakFreeContext context)
         {
-            using var context = new BreakFreeContext();
-            context.Habits.Add(habit);
-            context.SaveChanges();
+            _context = context;
         }
 
+        public void AddHabit(Habit habit)
+        {
+            _context.Habits.Add(habit);
+            _context.SaveChanges();
+        }
 
         public List<Habit> GetHabitsByUser(int userId)
         {
-            using var context = new BreakFreeContext();
-            return context.Habits.Where(h => h.UserId == userId).ToList();
+            return _context.Habits.Where(h => h.UserId == userId).ToList();
         }
-
 
         public void DeleteHabit(int habitId)
         {
-            using var context = new BreakFreeContext();
-            var habit = context.Habits.FirstOrDefault(h => h.HabitId == habitId);
-
+            var habit = _context.Habits.FirstOrDefault(h => h.HabitId == habitId);
             if (habit != null)
             {
-                context.Habits.Remove(habit);
-                context.SaveChanges();
+                _context.Habits.Remove(habit);
+                _context.SaveChanges();
             }
         }
 
-
         public void UpdateHabit(Habit habit)
         {
-            using var context = new BreakFreeContext();
-            context.Habits.Update(habit);
-            context.SaveChanges();
+            _context.Habits.Update(habit);
+            _context.SaveChanges();
         }
     }
 }

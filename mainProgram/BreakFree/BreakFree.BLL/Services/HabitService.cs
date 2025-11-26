@@ -1,27 +1,27 @@
 ﻿using BreakFree.BLL.Interfaces;
+using BreakFree.DAL;
 using BreakFree.DAL.Entities;
 using BreakFree.DAL.Repositories;
 using System;
 using System.Collections.Generic;
 
-
 namespace BreakFree.BLL.Services
 {
     public class HabitService : IHabitService
     {
-
         private readonly HabitRepository _habitRepository;
 
-
-        public HabitService()
+        public HabitService() : this(new HabitRepository(new BreakFreeContext()))
         {
-            _habitRepository = new HabitRepository();
         }
 
+        public HabitService(HabitRepository habitRepository)
+        {
+            _habitRepository = habitRepository;
+        }
 
         public void AddHabit(int userId, string name, DateTime startDate, int goal, string motivation)
         {
-
             var habit = new Habit
             {
                 UserId = userId,
@@ -34,7 +34,6 @@ namespace BreakFree.BLL.Services
 
             _habitRepository.AddHabit(habit);
         }
-
 
         public List<Habit> GetUserHabits(int userId)
         {

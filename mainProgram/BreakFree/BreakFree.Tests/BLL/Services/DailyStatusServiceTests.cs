@@ -1,0 +1,98 @@
+using Xunit;
+using BreakFree.BLL.Services;
+using BreakFree.DAL.Repositories;
+using BreakFree.DAL.Entities;
+using BreakFree.DAL;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+
+public class DailyStatusServiceTests
+{
+    private BreakFreeContext GetInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<BreakFreeContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new BreakFreeContext(options);
+    }
+
+    [Fact]
+    public void AddDailyStatus_ShouldAddStatus()
+    {
+        using var context = GetInMemoryContext();
+        var repository = new DailyStatusRepository(context);
+        var service = new DailyStatusService(repository);
+
+        var status = new DailyStatus
+        {
+            HabitId = 1,
+            DateTime = DateTime.Today,
+            Trigger = "Test trigger",
+            Note = "Test note",
+            CravingLevel = 3
+        };
+
+        service.AddDailyStatus(status);
+
+        var savedStatus = context.DailyStatuses.FirstOrDefault();
+        Assert.NotNull(savedStatus);
+        Assert.Equal(1, savedStatus.HabitId);
+        Assert.Equal("Test trigger", savedStatus.Trigger);
+        Assert.Equal("Test note", savedStatus.Note);
+        Assert.Equal(3, savedStatus.CravingLevel);
+    }
+
+    [Fact]
+    public void GetStatusesByHabit_ShouldReturnOnlyHabitStatuses()
+    {
+        using var context = GetInMemoryContext();
+        context.DailyStatuses.AddRange(
+            new DailyStatus { HabitId = 1, DateTime = DateTime.Today },
+            new DailyStatus { HabitId = 2, DateTime = DateTime.Today }
+        );
+        context.SaveChanges();
+
+        var repository = new DailyStatusRepository(context);
+        var service = new DailyStatusService(repository);
+
+        var habit1Statuses = service.GetStatusesByHabit(1);
+        Assert.Single(habit1Statuses);
+        Assert.Equal(1, habit1Statuses[0].HabitId);
+
+        var habit2Statuses = service.GetStatusesByHabit(2);
+        Assert.Single(habit2Statuses);
+        Assert.Equal(2, habit2Statuses[0].HabitId);
+    }
+
+    [Fact]
+    public void GetStatusesByUser_ShouldReturnStatusesForUser()
+    {
+        using var context = GetInMemoryContext();
+
+        // Для цього тесту потрібно додати Habit з UserId, бо GetStatusesByUser робить join на Habits
+        context.Habits.AddRange(
+            new BreakFree.DAL.Entities.Habit { HabitId = 1, UserId = 1 },
+            new BreakFree.DAL.Entities.Habit { HabitId = 2, UserId = 2 }
+        );
+
+        context.DailyStatuses.AddRange(
+            new DailyStatus { HabitId = 1, DateTime = DateTime.Today },
+            new DailyStatus { HabitId = 2, DateTime = DateTime.Today }
+        );
+
+        context.SaveChanges();
+
+        var repository = new DailyStatusRepository(context);
+        var service = new DailyStatusService(repository);
+
+        var user1Statuses = service.GetStatusesByUser(1);
+        Assert.Single(user1Statuses);
+        Assert.Equal(1, user1Statuses[0].HabitId);
+
+        var user2Statuses = service.GetStatusesByUser(2);
+        Assert.Single(user2Statuses);
+        Assert.Equal(2, user2Statuses[0].HabitId);
+    }
+}

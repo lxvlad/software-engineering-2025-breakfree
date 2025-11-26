@@ -25,6 +25,7 @@ Thumbs.db
 *BreakFree.BLL.csproj
 *BreakFree.DAL.csproj
 *BreakFree.Presentation.csproj
+*BreakFree.Tests.csproj
 
 *breakfree.db
 *breakfree.sqbpro
