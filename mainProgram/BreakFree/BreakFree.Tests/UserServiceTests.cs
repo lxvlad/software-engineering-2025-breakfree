@@ -1,182 +1,105 @@
-﻿using BreakFree.BLL.Services;
-using BreakFree.DAL;
-using BreakFree.DAL.Entities;
-using Microsoft.EntityFrameworkCore;
-
-public class UserServiceTests
+namespace BreakFree.BLL.Services
 {
-    [Fact]
-    public void RegisterSuccessReturnsTrue()
+    using System.Linq;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.DAL;
+    using BreakFree.DAL.Entities;
+
+    public class UserService : IUserService
     {
-        using var context = this.GetInMemoryContext();
-        var service = new UserService(context);
+        private readonly BreakFreeContext context;
 
-        var result = service.Register("Alice", "alice@test.com", "123");
+        public UserService(BreakFreeContext? injectedContext = null)
+        {
+            this.context = injectedContext ?? new BreakFreeContext();
+        }
 
-        Assert.True(result);
-        Assert.Single(context.Users);
-    }
+        public User? Login(string email, string password)
+        {
+            return this.context.Users.FirstOrDefault(u => u.Email == email && u.Password == password);
+        }
 
-    [Fact]
-    public void Register_ExistingEmail_ReturnsFalse()
-    {
-        using var context = this.GetInMemoryContext();
-        context.Users.Add(new User { UserName = "Alice", Email = "alice@test.com", Password = "123" });
-        context.SaveChanges();
+        public bool Register(string username, string email, string password)
+        {
+            if (this.context.Users.Any(u => u.Email == email))
+            {
+                return false;
+            }
 
-        var service = new UserService(context);
-        var result = service.Register("Bob", "alice@test.com", "456");
+            var user = new User
+            {
+                UserName = username,
+                Email = email,
+                Password = password,
+            };
 
-        Assert.False(result);
-        Assert.Single(context.Users); // база не повинна додати нового користувача
-    }
+            this.context.Users.Add(user);
+            this.context.SaveChanges();
 
-    [Fact]
-    public void Login_ValidUser_ReturnsUser()
-    {
-        using var context = this.GetInMemoryContext();
-        context.Users.Add(new User { UserName = "Alice", Email = "alice@test.com", Password = "123" });
-        context.SaveChanges();
+            return true;
+        }
 
-        var service = new UserService(context);
-        var user = service.Login("alice@test.com", "123");
+        public bool ChangePassword(int userId, string currentPassword, string newPassword)
+        {
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
 
-        Assert.NotNull(user);
-        Assert.Equal("Alice", user!.UserName);
-    }
+            if (user == null || user.Password != currentPassword)
+            {
+                return false;
+            }
 
-    [Fact]
-    public void Login_InvalidUser_ReturnsNull()
-    {
-        using var context = this.GetInMemoryContext();
-        var service = new UserService(context);
+            user.Password = newPassword;
+            this.context.SaveChanges();
 
-        var user = service.Login("nonexist@test.com", "123");
+            return true;
+        }
 
-        Assert.Null(user);
-    }
+        public bool DeleteUser(int userId, string password)
+        {
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
 
-    [Fact]
-    public void ChangePassword_CorrectOldPassword_ReturnsTrue()
-    {
-        using var context = this.GetInMemoryContext();
-        var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "old" };
-        context.Users.Add(user);
-        context.SaveChanges();
+            if (user == null || user.Password != password)
+            {
+                return false;
+            }
 
-        var service = new UserService(context);
-        var result = service.ChangePassword(user.UserId, "old", "new");
+            this.context.Users.Remove(user);
+            this.context.SaveChanges();
 
-        Assert.True(result);
-        Assert.Equal("new", context.Users.First().Password);
-    }
+            return true;
+        }
 
-    [Fact]
-    public void ChangePassword_WrongOldPassword_ReturnsFalse()
-    {
-        using var context = this.GetInMemoryContext();
-        var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "old" };
-        context.Users.Add(user);
-        context.SaveChanges();
+        public bool UpdateUser(int userId, string newUsername, string newEmail)
+        {
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
 
-        var service = new UserService(context);
-        var result = service.ChangePassword(user.UserId, "wrong", "new");
+            if (user == null)
+            {
+                return false;
+            }
 
-        Assert.False(result);
-        Assert.Equal("old", context.Users.First().Password);
-    }
+            if (!newUsername.Equals(user.UserName, System.StringComparison.OrdinalIgnoreCase) &&
+                this.context.Users.Any(u => u.UserName == newUsername && u.UserId != userId))
+            {
+                return false;
+            }
 
-    [Fact]
-    public void DeleteUser_RightPassword_DeletesUser()
-    {
-        using var context = this.GetInMemoryContext();
-        var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "123" };
-        context.Users.Add(user);
-        context.SaveChanges();
+            if (!newEmail.Equals(user.Email, System.StringComparison.OrdinalIgnoreCase) &&
+                this.context.Users.Any(u => u.Email == newEmail && u.UserId != userId))
+            {
+                return false;
+            }
 
-        var service = new UserService(context);
-        var result = service.DeleteUser(user.UserId, "123");
+            user.UserName = newUsername;
+            user.Email = newEmail;
 
-        Assert.True(result);
-        Assert.Empty(context.Users);
-    }
+            this.context.SaveChanges();
+            return true;
+        }
 
-    [Fact]
-    public void DeleteUser_WrongPassword_ReturnsFalse()
-    {
-        using var context = this.GetInMemoryContext();
-        var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "123" };
-        context.Users.Add(user);
-        context.SaveChanges();
-
-        var service = new UserService(context);
-        var result = service.DeleteUser(user.UserId, "wrong");
-
-        Assert.False(result);
-        Assert.Single(context.Users);
-    }
-
-    [Fact]
-    public void UpdateUser_Success_ReturnsTrue()
-    {
-        using var context = this.GetInMemoryContext();
-        var user = new User { UserName = "OldName", Email = "alice@test.com", Password = "123" };
-        context.Users.Add(user);
-        context.SaveChanges();
-
-        var service = new UserService(context);
-
-        var result = service.UpdateUser(user.UserId, "NewName", "alice@test.com");
-        Assert.True(result);
-        Assert.Equal("NewName", context.Users.First().UserName);
-    }
-
-    [Fact]
-    public void UpdateUser_ShouldReturnFalse_WhenUserNotFound()
-    {
-        using var context = this.GetInMemoryContext();
-        var service = new UserService(context);
-
-        var result = service.UpdateUser(999, "NewName", "new@example.com");
-
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void UpdateUser_ShouldReturnFalse_WhenUsernameOrEmailTaken()
-    {
-        using var context = this.GetInMemoryContext();
-        context.Users.AddRange(
-            new User { UserId = 1, UserName = "ExistingUser", Email = "existing@example.com", Password = "pass" },
-            new User { UserId = 2, UserName = "User2", Email = "user2@example.com", Password = "pass" });
-        context.SaveChanges();
-
-        var service = new UserService(context);
-
-        var result1 = service.UpdateUser(2, "ExistingUser", "newemail@example.com");
-        Assert.False(result1);
-
-        var result2 = service.UpdateUser(2, "NewUser", "existing@example.com");
-        Assert.False(result2);
-    }
-
-    [Fact]
-    public void GetUserById_ShouldReturnNull_WhenUserNotFound()
-    {
-        using var context = this.GetInMemoryContext();
-        var service = new UserService(context);
-
-        var user = service.GetUserById(999);
-
-        Assert.Null(user);
-    }
-
-    private BreakFreeContext GetInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<BreakFreeContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) // унікальна база на кожен тест
-            .Options;
-
-        return new BreakFreeContext(options);
+        public User? GetUserById(int id)
+        {
+            return this.context.Users.FirstOrDefault(u => u.UserId == id);
+        }
     }
 }

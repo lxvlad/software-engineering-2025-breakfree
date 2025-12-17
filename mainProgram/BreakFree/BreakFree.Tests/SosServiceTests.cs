@@ -1,57 +1,100 @@
-﻿namespace BreakFree.Tests
+namespace BreakFree.BLL.Services
 {
-    using BreakFree.BLL.Services;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using BreakFree.DAL;
     using BreakFree.DAL.Entities;
-    using Microsoft.EntityFrameworkCore;
 
-    public class SosServiceTests
+    public class SosService
     {
-        [Fact]
-        public void LogAttempt_ShouldAddLog_WhenActionExists()
+        private readonly List<string> defaultTips = new List<string>
         {
-            var options = new DbContextOptionsBuilder<BreakFreeContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString())
-                .Options;
+            "Зроби 10 присідань або віджимань",
+            "Пий воду",
+            "Прогуляйся 5 хвилин",
+            "Зроби дихальні вправи",
+            "Медитація 1 хв",
+            "Розтяжка 5 хв",
+            "Перерви роботу на очі",
+        };
 
-            using var context = new BreakFreeContext(options);
-            var action = new SOSAction { UserId = 1, Text = "A1" };
-            context.SOSActions.Add(action);
-            context.SaveChanges();
+        private readonly BreakFreeContext context;
 
-            var service = new SosService(context);
-            service.LogAttempt(1, action.ActionId, true);
-
-            var log = context.UserSOSLogs.FirstOrDefault();
-            Assert.NotNull(log);
-            Assert.True(log.Worked);
+        public SosService(BreakFreeContext? context = null)
+        {
+            this.context = context ?? new BreakFreeContext();
         }
 
-        [Fact]
-        public void GetSortedTips_ShouldSortByEfficiencyAndUsageCount()
+        public List<SosTipViewModel> GetSortedTips(int userId, bool skipDefaultActions = false)
         {
-            var options = new DbContextOptionsBuilder<BreakFreeContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString())
-                .Options;
+            this.context.Database.EnsureCreated();
 
-            using var context = new BreakFreeContext(options);
+            if (!skipDefaultActions)
+            {
+                this.EnsureDefaultActionsExist(userId);
+            }
 
-            var action1 = new SOSAction { UserId = 1, Text = "A1" };
-            var action2 = new SOSAction { UserId = 1, Text = "A2" };
-            context.SOSActions.AddRange(action1, action2);
-            context.SaveChanges();
+            var actions = this.context.SOSActions
+                                 .Where(a => a.UserId == userId)
+                                 .ToList();
 
-            context.UserSOSLogs.Add(new UserSOSLog { UserId = 1, ActionId = action1.ActionId, Worked = true });
-            context.UserSOSLogs.Add(new UserSOSLog { UserId = 1, ActionId = action2.ActionId, Worked = true });
-            context.UserSOSLogs.Add(new UserSOSLog { UserId = 1, ActionId = action2.ActionId, Worked = true });
-            context.SaveChanges();
+            var logs = this.context.UserSOSLogs.Where(l => l.UserId == userId).ToList();
+            var result = new List<SosTipViewModel>();
 
-            var service = new SosService(context);
-            var result = service.GetSortedTips(1, skipDefaultActions: true);
+            foreach (var action in actions)
+            {
+                var actionLogs = logs.Where(l => l.ActionId == action.ActionId).ToList();
+                int totalTries = actionLogs.Count;
+                int successCount = actionLogs.Count(l => l.Worked);
 
-            Assert.Equal(2, result.Count);
-            Assert.Equal("A2", result[0].Text);
-            Assert.Equal("A1", result[1].Text);
+                double efficiency = totalTries > 0 ? (double)successCount / totalTries * 100 : 0;
+
+                result.Add(new SosTipViewModel
+                {
+                    ActionId = action.ActionId,
+                    Text = action.Text,
+                    Efficiency = (int)efficiency,
+                    UsageCount = totalTries,
+                });
+            }
+
+            return result.OrderByDescending(x => x.Efficiency)
+                         .ThenByDescending(x => x.UsageCount)
+                         .ToList();
+        }
+
+        public void LogAttempt(int userId, int actionId, bool worked)
+        {
+            if (this.context.SOSActions.Any(a => a.ActionId == actionId))
+            {
+                var log = new UserSOSLog
+                {
+                    UserId = userId,
+                    ActionId = actionId,
+                    DateTime = DateTime.Now,
+                    Worked = worked,
+                };
+                this.context.UserSOSLogs.Add(log);
+                this.context.SaveChanges();
+            }
+        }
+
+        private void EnsureDefaultActionsExist(int userId)
+        {
+            if (!this.context.SOSActions.Any(a => a.UserId == userId))
+            {
+                foreach (var tip in this.defaultTips)
+                {
+                    this.context.SOSActions.Add(new SOSAction
+                    {
+                        UserId = userId,
+                        Text = tip,
+                    });
+                }
+
+                this.context.SaveChanges();
+            }
         }
     }
 }

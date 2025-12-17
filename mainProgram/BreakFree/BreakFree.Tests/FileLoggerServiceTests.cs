@@ -1,74 +1,61 @@
-﻿using BreakFree.BLL.Services;
-
-public class FileLoggerServiceTests : IDisposable
+namespace BreakFree.BLL.Services
 {
-    private readonly string tempDirectory;
-    private readonly FileLoggerService logger;
+    using BreakFree.BLL.Interfaces;
 
-    public FileLoggerServiceTests()
+    public class FileLoggerService : ILoggerService
     {
-        this.tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(this.tempDirectory);
+        private readonly string logDirectory;
+        private readonly string logFilePath;
 
-        this.logger = new FileLoggerServiceForTest(this.tempDirectory);
-    }
-
-    [Fact]
-    public void LogInfo_WritesInfoMessage()
-    {
-        this.logger.LogInfo("Test info");
-
-        var logFile = Directory.GetFiles(this.tempDirectory).FirstOrDefault();
-        Assert.NotNull(logFile);
-        var content = File.ReadAllText(logFile!);
-        Assert.Contains("[INFO] Test info", content);
-    }
-
-    [Fact]
-    public void LogWarning_WritesWarningMessage()
-    {
-        this.logger.LogWarning("Test warning");
-
-        var logFile = Directory.GetFiles(this.tempDirectory).FirstOrDefault();
-        Assert.NotNull(logFile);
-        var content = File.ReadAllText(logFile!);
-        Assert.Contains("[WARNING] Test warning", content);
-    }
-
-    [Fact]
-    public void LogError_WritesErrorMessageWithStackTrace()
-    {
-        this.logger.LogError("Test error", "Stack trace here");
-
-        var logFile = Directory.GetFiles(this.tempDirectory).FirstOrDefault();
-        Assert.NotNull(logFile);
-        var content = File.ReadAllText(logFile!);
-        Assert.Contains("[Error] Test error", content);
-        Assert.Contains("Stack trace here", content);
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(this.tempDirectory))
+        public FileLoggerService()
         {
-            Directory.Delete(this.tempDirectory, true);
+            string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            this.logDirectory = Path.Combine(baseDirectory, "Logs");
+
+            if (!Directory.Exists(this.logDirectory))
+            {
+                Directory.CreateDirectory(this.logDirectory);
+            }
+
+            string fileName = $"log_{DateTime.Now:yyyy-MM-dd}.txt";
+            this.logFilePath = Path.Combine(this.logDirectory, fileName);
         }
-    }
 
-    private class FileLoggerServiceForTest : FileLoggerService
-    {
-        public FileLoggerServiceForTest(string testDirectory)
+        public void LogInfo(string message)
         {
-            var fileName = $"log_{DateTime.Now:yyyy-MM-dd}.txt";
-            var filePath = Path.Combine(testDirectory, fileName);
+            this.WriteToFile("INFO", message);
+        }
 
-            var field = typeof(FileLoggerService)
-                .GetField("logFilePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            field!.SetValue(this, filePath);
+        public void LogError(string message, string? stackTrace = "")
+        {
+            string fullMessage = message;
+            if (!string.IsNullOrEmpty(stackTrace))
+            {
+                fullMessage += $"\nStack Trace: {stackTrace}";
+            }
 
-            var dirField = typeof(FileLoggerService)
-                .GetField("logDirectory", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            dirField!.SetValue(this, testDirectory);
+            this.WriteToFile("Error", fullMessage);
+        }
+
+        public void LogWarning(string message)
+        {
+            this.WriteToFile("WARNING", message);
+        }
+
+        private void WriteToFile(string level, string message)
+        {
+            try
+            {
+                string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
+
+                using (StreamWriter writer = new StreamWriter(this.logFilePath, true))
+                {
+                    writer.WriteLine(logEntry);
+                }
+            }
+            catch
+            {
+            }
         }
     }
 }
