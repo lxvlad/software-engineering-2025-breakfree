@@ -1,43 +1,43 @@
-﻿using BreakFree.DAL.Entities;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace BreakFree.DAL.Repositories
+﻿namespace BreakFree.DAL.Repositories
 {
+    using System.Collections.Generic;
+    using System.Linq;
+    using BreakFree.DAL.Entities;
+
     public class HabitRepository
     {
-        private readonly BreakFreeContext _context;
+        private readonly BreakFreeContext context;
 
-        public HabitRepository(BreakFreeContext context)
+        public HabitRepository(BreakFreeContext? injectedContext = null)
         {
-            _context = context;
+            this.context = injectedContext ?? new BreakFreeContext();
         }
 
         public void AddHabit(Habit habit)
         {
-            _context.Habits.Add(habit);
-            _context.SaveChanges();
+            this.context.Habits.Add(habit);
+            this.context.SaveChanges();
         }
 
         public List<Habit> GetHabitsByUser(int userId)
         {
-            return _context.Habits.Where(h => h.UserId == userId).ToList();
+            return this.context.Habits.Where(h => h.UserId == userId).ToList();
         }
 
         public void DeleteHabit(int habitId)
         {
-            var habit = _context.Habits.FirstOrDefault(h => h.HabitId == habitId);
+            var habit = this.context.Habits.FirstOrDefault(h => h.HabitId == habitId);
             if (habit != null)
             {
-                _context.Habits.Remove(habit);
-                _context.SaveChanges();
+                this.context.Habits.Remove(habit);
+                this.context.SaveChanges();
             }
         }
 
         public void UpdateHabit(Habit habit)
         {
-            _context.Habits.Update(habit);
-            _context.SaveChanges();
+            this.context.Habits.Update(habit);
+            this.context.SaveChanges();
         }
     }
 }

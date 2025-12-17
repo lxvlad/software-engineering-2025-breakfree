@@ -1,7 +1,7 @@
-﻿using BreakFree.DAL.Entities;
-
-namespace BreakFree.BLL.Interfaces
+﻿namespace BreakFree.BLL.Interfaces
 {
+    using BreakFree.DAL.Entities;
+
     public interface IUserService
     {
         User? Login(string email, string password);

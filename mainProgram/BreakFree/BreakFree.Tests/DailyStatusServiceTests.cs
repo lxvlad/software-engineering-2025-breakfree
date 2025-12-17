@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using BreakFree.BLL.Services;
 using BreakFree.DAL.Repositories;
 using BreakFree.DAL.Entities;
@@ -6,6 +6,7 @@ using BreakFree.DAL;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 public class DailyStatusServiceTests
 {
@@ -71,10 +72,9 @@ public class DailyStatusServiceTests
     {
         using var context = GetInMemoryContext();
 
-        // Для цього тесту потрібно додати Habit з UserId, бо GetStatusesByUser робить join на Habits
         context.Habits.AddRange(
-            new BreakFree.DAL.Entities.Habit { HabitId = 1, UserId = 1 },
-            new BreakFree.DAL.Entities.Habit { HabitId = 2, UserId = 2 }
+            new Habit { HabitId = 1, UserId = 1 },
+            new Habit { HabitId = 2, UserId = 2 }
         );
 
         context.DailyStatuses.AddRange(
@@ -94,5 +94,55 @@ public class DailyStatusServiceTests
         var user2Statuses = service.GetStatusesByUser(2);
         Assert.Single(user2Statuses);
         Assert.Equal(2, user2Statuses[0].HabitId);
+    }
+
+    [Fact]
+    public void UpdateDailyStatus_ShouldUpdateStatus()
+    {
+        using var context = GetInMemoryContext();
+        var status = new DailyStatus
+        {
+            HabitId = 1,
+            DateTime = DateTime.Today,
+            Trigger = "Original",
+            Note = "Original note",
+            CravingLevel = 2
+        };
+        context.DailyStatuses.Add(status);
+        context.SaveChanges();
+
+        var repository = new DailyStatusRepository(context);
+        var service = new DailyStatusService(repository);
+
+        status.Trigger = "Updated";
+        status.CravingLevel = 5;
+        service.UpdateDailyStatus(status);
+
+        var updatedStatus = context.DailyStatuses.FirstOrDefault();
+        Assert.Equal("Updated", updatedStatus.Trigger);
+        Assert.Equal(5, updatedStatus.CravingLevel);
+    }
+
+    [Fact]
+    public void DeleteDailyStatus_ShouldRemoveStatus()
+    {
+        using var context = GetInMemoryContext();
+        var status = new DailyStatus { HabitId = 1, DateTime = DateTime.Today };
+        context.DailyStatuses.Add(status);
+        context.SaveChanges();
+
+        var repository = new DailyStatusRepository(context);
+        var service = new DailyStatusService(repository);
+
+        service.DeleteDailyStatus(status.StatusId);
+
+        Assert.Empty(context.DailyStatuses.ToList());
+    }
+
+    [Fact]
+    public void DefaultConstructor_ShouldCreateRepository()
+    {
+        var service = new DailyStatusService();
+        Assert.NotNull(service);
     }
 }

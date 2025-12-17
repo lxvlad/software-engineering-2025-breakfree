@@ -1,8 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-
-
-namespace BreakFree.DAL.Entities
+﻿namespace BreakFree.DAL.Entities
 {
+    using System.ComponentModel.DataAnnotations.Schema;
+
     [Table("Users")]
     public class User
     {

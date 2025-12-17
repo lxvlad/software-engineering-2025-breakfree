@@ -1,13 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-
-namespace BreakFree.DAL.Entities
+﻿namespace BreakFree.DAL.Entities
 {
+    using System.ComponentModel.DataAnnotations;
+    using System.ComponentModel.DataAnnotations.Schema;
+
     [Table("SOSActions")]
     public class SOSAction
     {
-        [Key] 
+        [Key]
         [Column("action_id")]
         public int ActionId { get; set; }
 

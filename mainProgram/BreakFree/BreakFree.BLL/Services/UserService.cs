@@ -1,86 +1,105 @@
-﻿using System.Linq;
-using BreakFree.DAL;
-using BreakFree.DAL.Entities;
-using BreakFree.BLL.Interfaces;
-
-namespace BreakFree.BLL.Services
+﻿namespace BreakFree.BLL.Services
 {
+    using System.Linq;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.DAL;
+    using BreakFree.DAL.Entities;
+
     public class UserService : IUserService
     {
-        private readonly BreakFreeContext _context;
+        private readonly BreakFreeContext context;
 
-        public UserService() : this(new BreakFreeContext())
+        public UserService(BreakFreeContext? injectedContext = null)
         {
-        }
-
-        public UserService(BreakFreeContext context)
-        {
-            _context = context;
+            this.context = injectedContext ?? new BreakFreeContext();
         }
 
         public User? Login(string email, string password)
         {
-            return _context.Users.FirstOrDefault(u => u.Email == email && u.Password == password);
+            return this.context.Users.FirstOrDefault(u => u.Email == email && u.Password == password);
         }
 
         public bool Register(string username, string email, string password)
         {
-            if (_context.Users.Any(u => u.Email == email))
+            if (this.context.Users.Any(u => u.Email == email))
+            {
                 return false;
+            }
 
-            var user = new User { UserName = username, Email = email, Password = password };
-            _context.Users.Add(user);
-            _context.SaveChanges();
+            var user = new User
+            {
+                UserName = username,
+                Email = email,
+                Password = password,
+            };
+
+            this.context.Users.Add(user);
+            this.context.SaveChanges();
+
             return true;
         }
 
         public bool ChangePassword(int userId, string currentPassword, string newPassword)
         {
-            var user = _context.Users.FirstOrDefault(u => u.UserId == userId);
-            if (user == null || user.Password != currentPassword) return false;
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
+
+            if (user == null || user.Password != currentPassword)
+            {
+                return false;
+            }
 
             user.Password = newPassword;
-            _context.SaveChanges();
+            this.context.SaveChanges();
+
             return true;
         }
 
         public bool DeleteUser(int userId, string password)
         {
-            var user = _context.Users.FirstOrDefault(u => u.UserId == userId);
-            if (user == null || user.Password != password) return false;
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
 
-            _context.Users.Remove(user);
-            _context.SaveChanges();
+            if (user == null || user.Password != password)
+            {
+                return false;
+            }
+
+            this.context.Users.Remove(user);
+            this.context.SaveChanges();
+
             return true;
         }
 
         public bool UpdateUser(int userId, string newUsername, string newEmail)
         {
-            var user = _context.Users.FirstOrDefault(u => u.UserId == userId);
-            if (user == null) return false;
+            var user = this.context.Users.FirstOrDefault(u => u.UserId == userId);
 
-            if (!newUsername.Equals(user.UserName, StringComparison.OrdinalIgnoreCase))
+            if (user == null)
             {
-                if (_context.Users.Any(u => u.UserName == newUsername && u.UserId != userId))
-                    return false;
+                return false;
             }
 
-            if (!newEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+            if (!newUsername.Equals(user.UserName, System.StringComparison.OrdinalIgnoreCase) &&
+                this.context.Users.Any(u => u.UserName == newUsername && u.UserId != userId))
             {
-                if (_context.Users.Any(u => u.Email == newEmail && u.UserId != userId))
-                    return false;
+                return false;
+            }
+
+            if (!newEmail.Equals(user.Email, System.StringComparison.OrdinalIgnoreCase) &&
+                this.context.Users.Any(u => u.Email == newEmail && u.UserId != userId))
+            {
+                return false;
             }
 
             user.UserName = newUsername;
             user.Email = newEmail;
-            _context.SaveChanges();
 
+            this.context.SaveChanges();
             return true;
         }
 
         public User? GetUserById(int id)
         {
-            return _context.Users.FirstOrDefault(u => u.UserId == id);
+            return this.context.Users.FirstOrDefault(u => u.UserId == id);
         }
     }
 }
