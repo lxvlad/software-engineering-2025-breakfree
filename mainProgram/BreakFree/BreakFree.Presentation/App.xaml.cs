@@ -1,9 +1,7 @@
-﻿using System.Windows;
-
-
-namespace BreakFree.Presentation
-
+﻿namespace BreakFree.Presentation
 {
+    using System.Windows;
+
     public partial class App : Application
     {
     }

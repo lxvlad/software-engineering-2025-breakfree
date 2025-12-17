@@ -136,10 +136,51 @@ public class UserServiceTests
         context.SaveChanges();
 
         var service = new UserService(context);
-        
-        var result = service.UpdateUser(user.UserId, "NewName", "alice@test.com"); // передаємо userId, newUsername, newEmail
 
+        var result = service.UpdateUser(user.UserId, "NewName", "alice@test.com");
         Assert.True(result);
         Assert.Equal("NewName", context.Users.First().UserName);
+    }
+
+
+    [Fact]
+    public void UpdateUser_ShouldReturnFalse_WhenUserNotFound()
+    {
+        using var context = GetInMemoryContext();
+        var service = new UserService(context);
+
+        var result = service.UpdateUser(999, "NewName", "new@example.com");
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void UpdateUser_ShouldReturnFalse_WhenUsernameOrEmailTaken()
+    {
+        using var context = GetInMemoryContext();
+        context.Users.AddRange(
+            new User { UserId = 1, UserName = "ExistingUser", Email = "existing@example.com", Password = "pass" },
+            new User { UserId = 2, UserName = "User2", Email = "user2@example.com", Password = "pass" }
+        );
+        context.SaveChanges();
+
+        var service = new UserService(context);
+
+        var result1 = service.UpdateUser(2, "ExistingUser", "newemail@example.com");
+        Assert.False(result1);
+
+        var result2 = service.UpdateUser(2, "NewUser", "existing@example.com");
+        Assert.False(result2);
+    }
+
+    [Fact]
+    public void GetUserById_ShouldReturnNull_WhenUserNotFound()
+    {
+        using var context = GetInMemoryContext();
+        var service = new UserService(context);
+
+        var user = service.GetUserById(999);
+
+        Assert.Null(user);
     }
 }

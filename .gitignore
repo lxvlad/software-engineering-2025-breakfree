@@ -26,6 +26,11 @@ Thumbs.db
 *BreakFree.DAL.csproj
 *BreakFree.Presentation.csproj
 *BreakFree.Tests.csproj
+*BreakFree.Presentation.csproj.Backup.tmp
 
+*coverage.json
+*coverage.opencover.xml
 *breakfree.db
 *breakfree.sqbpro
+
+mainProgram/BreakFree/BreakFree.Tests/coverage-report/

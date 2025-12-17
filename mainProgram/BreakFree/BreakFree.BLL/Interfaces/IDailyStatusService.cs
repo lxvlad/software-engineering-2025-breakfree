@@ -1,15 +1,13 @@
-﻿using BreakFree.DAL.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BreakFree.BLL.Interfaces
+﻿namespace BreakFree.BLL.Interfaces
 {
+    using BreakFree.DAL.Entities;
+
     public interface IDailyStatusService
     {
-        
         void AddDailyStatus(DailyStatus status);
+
+        void UpdateDailyStatus(DailyStatus status);
+
+        void DeleteDailyStatus(int statusId);
     }
 }
