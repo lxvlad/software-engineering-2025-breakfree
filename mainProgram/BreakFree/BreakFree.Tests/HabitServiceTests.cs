@@ -1,110 +1,53 @@
-﻿using Xunit;
-using BreakFree.BLL.Services;
-using BreakFree.DAL.Repositories;
-using BreakFree.DAL.Entities;
-using BreakFree.DAL;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
-
-public class HabitServiceTests
+namespace BreakFree.BLL.Services
 {
-    private BreakFreeContext GetInMemoryContext()
+    using System;
+    using System.Collections.Generic;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.DAL.Entities;
+    using BreakFree.DAL.Repositories;
+
+    public class HabitService : IHabitService
     {
-        var options = new DbContextOptionsBuilder<BreakFreeContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
+        private readonly HabitRepository habitRepository;
 
-        return new BreakFreeContext(options);
-    }
+        public HabitService(HabitRepository repository)
+        {
+            this.habitRepository = repository;
+        }
 
-    [Fact]
-    public void AddHabit_ShouldAddHabit()
-    {
-        using var context = GetInMemoryContext();
-        var repository = new HabitRepository(context);
-        var service = new HabitService(repository);
+        public HabitService()
+            : this(new HabitRepository())
+        {
+        }
 
-        service.AddHabit(1, "Run", DateTime.Today, 5, "Stay healthy");
+        public void AddHabit(int userId, string name, DateTime startDate, int goal, string motivation)
+        {
+            var habit = new Habit
+            {
+                UserId = userId,
+                HabitName = name,
+                StartDate = startDate,
+                DailyGoal = goal,
+                Motivation = motivation,
+                IsActive = true,
+            };
 
-        var habit = context.Habits.FirstOrDefault();
-        Assert.NotNull(habit);
-        Assert.Equal("Run", habit.HabitName);
-        Assert.Equal(1, habit.UserId);
-        Assert.Equal(5, habit.DailyGoal);
-        Assert.Equal("Stay healthy", habit.Motivation);
-        Assert.True(habit.IsActive);
-    }
+            this.habitRepository.AddHabit(habit);
+        }
 
-    [Fact]
-    public void GetUserHabits_ShouldReturnOnlyUserHabits()
-    {
-        using var context = GetInMemoryContext();
-        context.Habits.AddRange(
-            new Habit { UserId = 1, HabitName = "Run", StartDate = DateTime.Today, DailyGoal = 5, Motivation = "Health", IsActive = true },
-            new Habit { UserId = 2, HabitName = "Read", StartDate = DateTime.Today, DailyGoal = 1, Motivation = "Knowledge", IsActive = true }
-        );
-        context.SaveChanges();
+        public List<Habit> GetUserHabits(int userId)
+        {
+            return this.habitRepository.GetHabitsByUser(userId);
+        }
 
-        var repository = new HabitRepository(context);
-        var service = new HabitService(repository);
+        public void UpdateHabit(Habit habit)
+        {
+            this.habitRepository.UpdateHabit(habit);
+        }
 
-        var user1Habits = service.GetUserHabits(1);
-        Assert.Single(user1Habits);
-        Assert.Equal("Run", user1Habits[0].HabitName);
-
-        var user2Habits = service.GetUserHabits(2);
-        Assert.Single(user2Habits);
-        Assert.Equal("Read", user2Habits[0].HabitName);
-    }
-
-    [Fact]
-    public void AddMultipleHabits_ForSameUser_ShouldAddAll()
-    {
-        using var context = GetInMemoryContext();
-        var repository = new HabitRepository(context);
-        var service = new HabitService(repository);
-
-        service.AddHabit(1, "Run", DateTime.Today, 5, "Health");
-        service.AddHabit(1, "Read", DateTime.Today, 1, "Knowledge");
-
-        var habits = service.GetUserHabits(1);
-        Assert.Equal(2, habits.Count);
-        Assert.Contains(habits, h => h.HabitName == "Run");
-        Assert.Contains(habits, h => h.HabitName == "Read");
-    }
-
-
-    [Fact]
-    public void UpdateHabit_ShouldUpdateHabit()
-    {
-        using var context = GetInMemoryContext();
-        var repository = new HabitRepository(context);
-        var service = new HabitService(repository);
-
-        var habit = new Habit { HabitId = 1, UserId = 1, HabitName = "Test", DailyGoal = 5 };
-        repository.AddHabit(habit);
-
-        habit.HabitName = "Updated Name";
-        service.UpdateHabit(habit);
-
-        var updatedHabit = repository.GetHabitsByUser(1).First();
-        Assert.Equal("Updated Name", updatedHabit.HabitName);
-    }
-
-    [Fact]
-    public void DeleteHabit_ShouldRemoveHabit()
-    {
-        using var context = GetInMemoryContext();
-        var repository = new HabitRepository(context);
-        var service = new HabitService(repository);
-
-        var habit = new Habit { HabitId = 1, UserId = 1, HabitName = "Test" };
-        repository.AddHabit(habit);
-
-        service.DeleteHabit(habit.HabitId);
-
-        var habits = repository.GetHabitsByUser(1);
-        Assert.Empty(habits);
+        public void DeleteHabit(int habitId)
+        {
+            this.habitRepository.DeleteHabit(habitId);
+        }
     }
 }

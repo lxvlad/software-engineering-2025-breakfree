@@ -8,8 +8,12 @@ namespace BreakFree.ConsoleSeed
     {
         static void Main(string[] args)
         {
-            var baseDir = AppContext.BaseDirectory;
+            Run();
+        }
 
+        public static void Run()
+        {
+            var baseDir = AppContext.BaseDirectory;
             string schemaPath = Path.Combine(baseDir, "create_breakfree.sql");
 
             Console.WriteLine("[BreakFree] Console ADO.NET utility");
@@ -17,7 +21,6 @@ namespace BreakFree.ConsoleSeed
             Console.WriteLine($"[INFO] Schema:  {schemaPath}");
 
             SqliteHelper.EnsureDatabase(schemaPath);
-
 
             Seed.SeedWithBogus(SqliteHelper.ConnectionString);
 
@@ -32,7 +35,6 @@ namespace BreakFree.ConsoleSeed
 
             Console.WriteLine("\nDone.");
         }
-
 
         public static void PrintTable(string connectionString, string table, int limit = 10)
         {
