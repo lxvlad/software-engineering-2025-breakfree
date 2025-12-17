@@ -1,28 +1,15 @@
-using Xunit;
-using BreakFree.BLL.Services;
-using BreakFree.DAL.Repositories;
-using BreakFree.DAL.Entities;
+﻿using BreakFree.BLL.Services;
 using BreakFree.DAL;
+using BreakFree.DAL.Entities;
+using BreakFree.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
 
 public class HabitServiceTests
 {
-    // Метод для створення ізольованої InMemory бази
-    private BreakFreeContext GetInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<BreakFreeContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()) // унікальна база на кожен тест
-            .Options;
-
-        return new BreakFreeContext(options);
-    }
-
     [Fact]
-    public void AddHabit_ShouldAddHabit()
+    public void AddHabitShouldAddHabit()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var repository = new HabitRepository(context);
         var service = new HabitService(repository);
 
@@ -40,11 +27,10 @@ public class HabitServiceTests
     [Fact]
     public void GetUserHabits_ShouldReturnOnlyUserHabits()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         context.Habits.AddRange(
             new Habit { UserId = 1, HabitName = "Run", StartDate = DateTime.Today, DailyGoal = 5, Motivation = "Health", IsActive = true },
-            new Habit { UserId = 2, HabitName = "Read", StartDate = DateTime.Today, DailyGoal = 1, Motivation = "Knowledge", IsActive = true }
-        );
+            new Habit { UserId = 2, HabitName = "Read", StartDate = DateTime.Today, DailyGoal = 1, Motivation = "Knowledge", IsActive = true });
         context.SaveChanges();
 
         var repository = new HabitRepository(context);
@@ -62,7 +48,7 @@ public class HabitServiceTests
     [Fact]
     public void AddMultipleHabits_ForSameUser_ShouldAddAll()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var repository = new HabitRepository(context);
         var service = new HabitService(repository);
 
@@ -73,5 +59,47 @@ public class HabitServiceTests
         Assert.Equal(2, habits.Count);
         Assert.Contains(habits, h => h.HabitName == "Run");
         Assert.Contains(habits, h => h.HabitName == "Read");
+    }
+
+    [Fact]
+    public void UpdateHabit_ShouldUpdateHabit()
+    {
+        using var context = this.GetInMemoryContext();
+        var repository = new HabitRepository(context);
+        var service = new HabitService(repository);
+
+        var habit = new Habit { HabitId = 1, UserId = 1, HabitName = "Test", DailyGoal = 5 };
+        repository.AddHabit(habit);
+
+        habit.HabitName = "Updated Name";
+        service.UpdateHabit(habit);
+
+        var updatedHabit = repository.GetHabitsByUser(1).First();
+        Assert.Equal("Updated Name", updatedHabit.HabitName);
+    }
+
+    [Fact]
+    public void DeleteHabit_ShouldRemoveHabit()
+    {
+        using var context = this.GetInMemoryContext();
+        var repository = new HabitRepository(context);
+        var service = new HabitService(repository);
+
+        var habit = new Habit { HabitId = 1, UserId = 1, HabitName = "Test" };
+        repository.AddHabit(habit);
+
+        service.DeleteHabit(habit.HabitId);
+
+        var habits = repository.GetHabitsByUser(1);
+        Assert.Empty(habits);
+    }
+
+    private BreakFreeContext GetInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<BreakFreeContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new BreakFreeContext(options);
     }
 }

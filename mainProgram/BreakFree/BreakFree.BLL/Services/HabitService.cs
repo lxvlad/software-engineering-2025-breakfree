@@ -1,23 +1,23 @@
-﻿using BreakFree.BLL.Interfaces;
-using BreakFree.DAL;
-using BreakFree.DAL.Entities;
-using BreakFree.DAL.Repositories;
-using System;
-using System.Collections.Generic;
-
-namespace BreakFree.BLL.Services
+﻿namespace BreakFree.BLL.Services
 {
+    using System;
+    using System.Collections.Generic;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.DAL.Entities;
+    using BreakFree.DAL.Repositories;
+
     public class HabitService : IHabitService
     {
-        private readonly HabitRepository _habitRepository;
+        private readonly HabitRepository habitRepository;
 
-        public HabitService() : this(new HabitRepository(new BreakFreeContext()))
+        public HabitService(HabitRepository repository)
         {
+            this.habitRepository = repository;
         }
 
-        public HabitService(HabitRepository habitRepository)
+        public HabitService()
+            : this(new HabitRepository())
         {
-            _habitRepository = habitRepository;
         }
 
         public void AddHabit(int userId, string name, DateTime startDate, int goal, string motivation)
@@ -29,15 +29,25 @@ namespace BreakFree.BLL.Services
                 StartDate = startDate,
                 DailyGoal = goal,
                 Motivation = motivation,
-                IsActive = true
+                IsActive = true,
             };
 
-            _habitRepository.AddHabit(habit);
+            this.habitRepository.AddHabit(habit);
         }
 
         public List<Habit> GetUserHabits(int userId)
         {
-            return _habitRepository.GetHabitsByUser(userId);
+            return this.habitRepository.GetHabitsByUser(userId);
+        }
+
+        public void UpdateHabit(Habit habit)
+        {
+            this.habitRepository.UpdateHabit(habit);
+        }
+
+        public void DeleteHabit(int habitId)
+        {
+            this.habitRepository.DeleteHabit(habitId);
         }
     }
 }

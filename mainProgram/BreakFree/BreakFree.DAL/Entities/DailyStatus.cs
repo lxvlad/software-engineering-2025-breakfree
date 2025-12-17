@@ -1,14 +1,13 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-namespace BreakFree.DAL.Entities
+﻿namespace BreakFree.DAL.Entities
 {
+    using System;
+    using System.ComponentModel.DataAnnotations;
+    using System.ComponentModel.DataAnnotations.Schema;
 
     [Table("DailyStatuses")]
     public class DailyStatus
     {
-        [Key] 
+        [Key]
         [Column("status_id")]
         public int StatusId { get; set; }
 

@@ -1,40 +1,48 @@
-﻿using BreakFree.BLL.Interfaces;
-using BreakFree.DAL;
-using BreakFree.DAL.Entities;
-using BreakFree.DAL.Repositories;
-using System;
-using System.Collections.Generic;
-
-namespace BreakFree.BLL.Services
+﻿namespace BreakFree.BLL.Services
 {
+    using System.Collections.Generic;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.DAL;
+    using BreakFree.DAL.Entities;
+    using BreakFree.DAL.Repositories;
+
     public class DailyStatusService : IDailyStatusService
     {
-        private readonly DailyStatusRepository _dailyStatusRepository;
+        private readonly DailyStatusRepository dailyStatusRepository;
 
-        // Порожній конструктор для продакшн
-        public DailyStatusService() : this(new DailyStatusRepository(new BreakFreeContext()))
+        public DailyStatusService(DailyStatusRepository repository)
         {
+            this.dailyStatusRepository = repository;
         }
 
-        // Конструктор для тестів
-        public DailyStatusService(DailyStatusRepository dailyStatusRepository)
+        public DailyStatusService()
         {
-            _dailyStatusRepository = dailyStatusRepository;
+            this.dailyStatusRepository = new DailyStatusRepository(new BreakFreeContext());
         }
 
         public void AddDailyStatus(DailyStatus status)
         {
-            _dailyStatusRepository.AddDailyStatus(status);
+            this.dailyStatusRepository.AddDailyStatus(status);
         }
 
         public List<DailyStatus> GetStatusesByHabit(int habitId)
         {
-            return _dailyStatusRepository.GetStatusesByHabit(habitId);
+            return this.dailyStatusRepository.GetStatusesByHabit(habitId);
         }
 
         public List<DailyStatus> GetStatusesByUser(int userId)
         {
-            return _dailyStatusRepository.GetStatusesByUser(userId);
+            return this.dailyStatusRepository.GetStatusesByUser(userId);
+        }
+
+        public void UpdateDailyStatus(DailyStatus status)
+        {
+            this.dailyStatusRepository.UpdateDailyStatus(status);
+        }
+
+        public void DeleteDailyStatus(int statusId)
+        {
+            this.dailyStatusRepository.DeleteDailyStatus(statusId);
         }
     }
 }

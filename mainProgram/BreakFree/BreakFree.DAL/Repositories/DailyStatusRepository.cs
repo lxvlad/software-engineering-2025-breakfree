@@ -1,49 +1,49 @@
-﻿using BreakFree.DAL.Entities;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace BreakFree.DAL.Repositories
+﻿namespace BreakFree.DAL.Repositories
 {
+    using System.Collections.Generic;
+    using System.Linq;
+    using BreakFree.DAL.Entities;
+
     public class DailyStatusRepository
     {
-        private readonly BreakFreeContext _context;
+        private readonly BreakFreeContext context;
 
         public DailyStatusRepository(BreakFreeContext context)
         {
-            _context = context;
+            this.context = context;
         }
 
         public void AddDailyStatus(DailyStatus status)
         {
-            _context.DailyStatuses.Add(status);
-            _context.SaveChanges();
+            this.context.DailyStatuses.Add(status);
+            this.context.SaveChanges();
         }
 
         public List<DailyStatus> GetStatusesByHabit(int habitId)
         {
-            return _context.DailyStatuses.Where(s => s.HabitId == habitId).ToList();
+            return this.context.DailyStatuses.Where(s => s.HabitId == habitId).ToList();
         }
 
         public void UpdateDailyStatus(DailyStatus status)
         {
-            _context.DailyStatuses.Update(status);
-            _context.SaveChanges();
+            this.context.DailyStatuses.Update(status);
+            this.context.SaveChanges();
         }
 
         public void DeleteDailyStatus(int statusId)
         {
-            var status = _context.DailyStatuses.FirstOrDefault(s => s.StatusId == statusId);
+            var status = this.context.DailyStatuses.FirstOrDefault(s => s.StatusId == statusId);
             if (status != null)
             {
-                _context.DailyStatuses.Remove(status);
-                _context.SaveChanges();
+                this.context.DailyStatuses.Remove(status);
+                this.context.SaveChanges();
             }
         }
 
         public List<DailyStatus> GetStatusesByUser(int userId)
         {
-            return _context.DailyStatuses
-                .Where(s => _context.Habits.Any(h => h.HabitId == s.HabitId && h.UserId == userId))
+            return this.context.DailyStatuses
+                .Where(s => this.context.Habits.Any(h => h.HabitId == s.HabitId && h.UserId == userId))
                 .ToList();
         }
     }

@@ -1,38 +1,53 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-
-
-namespace BreakFree.Presentation.Views
+﻿namespace BreakFree.Presentation.Views
 {
+    using System.Windows;
+    using BreakFree.BLL.Interfaces;
+    using BreakFree.BLL.Services;
 
     public partial class Support : Window
     {
+        private readonly int userId;
+        private readonly ILoggerService logger;
 
         public Support()
+            : this(0)
         {
-            InitializeComponent();
         }
 
+        public Support(int userId)
+        {
+            this.InitializeComponent();
+            this.userId = userId;
+
+            this.logger = new FileLoggerService();
+            this.logger.LogInfo($"Вікно 'Звернутися у підтримку' було відкрито. UserID: {userId}.");
+
+            this.Closing += this.Support_Closing;
+        }
+
+        private void Support_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            this.logger.LogInfo($"Вікно 'Звернутися у підтримку' було закрито.");
+
+            if (this.Owner != null)
+            {
+                this.Owner.Show();
+            }
+        }
 
         private void SendButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            this.logger.LogInfo($"Повідомлення було надіслане у підтримку. UserID: {this.userId}.");
+            MessageBox.Show("Повідомлення надіслано! Дякуємо.");
+            this.GoBack();
         }
 
-
         private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.GoBack();
+        }
+
+        private void GoBack()
         {
             this.Close();
         }

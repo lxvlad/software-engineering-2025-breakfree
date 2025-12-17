@@ -1,37 +1,26 @@
-﻿using Xunit;
-using BreakFree.BLL.Services;
+﻿using BreakFree.BLL.Services;
 using BreakFree.DAL;
 using BreakFree.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
 public class UserServiceTests
 {
-    // Метод для створення ізольованої InMemory бази
-    private BreakFreeContext GetInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<BreakFreeContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) // унікальна база на кожен тест
-            .Options;
-
-        return new BreakFreeContext(options);
-    }
-
     [Fact]
-    public void Register_Success_ReturnsTrue()
+    public void RegisterSuccessReturnsTrue()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var service = new UserService(context);
 
         var result = service.Register("Alice", "alice@test.com", "123");
 
         Assert.True(result);
-        Assert.Single(context.Users); // переконуємося, що в базі один користувач
+        Assert.Single(context.Users);
     }
 
     [Fact]
     public void Register_ExistingEmail_ReturnsFalse()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         context.Users.Add(new User { UserName = "Alice", Email = "alice@test.com", Password = "123" });
         context.SaveChanges();
 
@@ -45,7 +34,7 @@ public class UserServiceTests
     [Fact]
     public void Login_ValidUser_ReturnsUser()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         context.Users.Add(new User { UserName = "Alice", Email = "alice@test.com", Password = "123" });
         context.SaveChanges();
 
@@ -59,7 +48,7 @@ public class UserServiceTests
     [Fact]
     public void Login_InvalidUser_ReturnsNull()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var service = new UserService(context);
 
         var user = service.Login("nonexist@test.com", "123");
@@ -70,7 +59,7 @@ public class UserServiceTests
     [Fact]
     public void ChangePassword_CorrectOldPassword_ReturnsTrue()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "old" };
         context.Users.Add(user);
         context.SaveChanges();
@@ -85,7 +74,7 @@ public class UserServiceTests
     [Fact]
     public void ChangePassword_WrongOldPassword_ReturnsFalse()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "old" };
         context.Users.Add(user);
         context.SaveChanges();
@@ -100,7 +89,7 @@ public class UserServiceTests
     [Fact]
     public void DeleteUser_RightPassword_DeletesUser()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "123" };
         context.Users.Add(user);
         context.SaveChanges();
@@ -115,7 +104,7 @@ public class UserServiceTests
     [Fact]
     public void DeleteUser_WrongPassword_ReturnsFalse()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var user = new User { UserName = "Alice", Email = "alice@test.com", Password = "123" };
         context.Users.Add(user);
         context.SaveChanges();
@@ -130,16 +119,64 @@ public class UserServiceTests
     [Fact]
     public void UpdateUser_Success_ReturnsTrue()
     {
-        using var context = GetInMemoryContext();
+        using var context = this.GetInMemoryContext();
         var user = new User { UserName = "OldName", Email = "alice@test.com", Password = "123" };
         context.Users.Add(user);
         context.SaveChanges();
 
         var service = new UserService(context);
-        
-        var result = service.UpdateUser(user.UserId, "NewName", "alice@test.com"); // передаємо userId, newUsername, newEmail
 
+        var result = service.UpdateUser(user.UserId, "NewName", "alice@test.com");
         Assert.True(result);
         Assert.Equal("NewName", context.Users.First().UserName);
+    }
+
+    [Fact]
+    public void UpdateUser_ShouldReturnFalse_WhenUserNotFound()
+    {
+        using var context = this.GetInMemoryContext();
+        var service = new UserService(context);
+
+        var result = service.UpdateUser(999, "NewName", "new@example.com");
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void UpdateUser_ShouldReturnFalse_WhenUsernameOrEmailTaken()
+    {
+        using var context = this.GetInMemoryContext();
+        context.Users.AddRange(
+            new User { UserId = 1, UserName = "ExistingUser", Email = "existing@example.com", Password = "pass" },
+            new User { UserId = 2, UserName = "User2", Email = "user2@example.com", Password = "pass" });
+        context.SaveChanges();
+
+        var service = new UserService(context);
+
+        var result1 = service.UpdateUser(2, "ExistingUser", "newemail@example.com");
+        Assert.False(result1);
+
+        var result2 = service.UpdateUser(2, "NewUser", "existing@example.com");
+        Assert.False(result2);
+    }
+
+    [Fact]
+    public void GetUserById_ShouldReturnNull_WhenUserNotFound()
+    {
+        using var context = this.GetInMemoryContext();
+        var service = new UserService(context);
+
+        var user = service.GetUserById(999);
+
+        Assert.Null(user);
+    }
+
+    private BreakFreeContext GetInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<BreakFreeContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) // унікальна база на кожен тест
+            .Options;
+
+        return new BreakFreeContext(options);
     }
 }
